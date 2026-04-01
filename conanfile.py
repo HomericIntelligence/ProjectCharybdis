@@ -1,0 +1,15 @@
+from conan import ConanFile
+from conan.tools.cmake import CMakeToolchain, CMakeDeps
+
+
+class ProjectCharybdisConan(ConanFile):
+    name = "projectcharybdis"
+    version = "0.1.0"
+    settings = "os", "compiler", "build_type", "arch"
+
+    def build_requirements(self):
+        self.test_requires("gtest/1.14.0")
+
+    def generate(self):
+        CMakeDeps(self).generate()
+        CMakeToolchain(self).generate()
