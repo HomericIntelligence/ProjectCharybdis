@@ -1,0 +1,125 @@
+/**
+ * @file test_payload_fuzzing.cpp
+ * @brief E05-E07, E14, E15: Adversarial payload fuzzing via Agamemnon REST API
+ *
+ * Sends malformed, oversized, truncated, and structurally invalid payloads.
+ * Verifies the server handles them gracefully (no crash, returns error codes).
+ *
+ * Requires: Agamemnon running at AGAMEMNON_URL
+ */
+
+#include "projectcharybdis/http_test_client.hpp"
+#include "projectcharybdis/test_helpers.hpp"
+
+#include <gtest/gtest.h>
+
+#include <random>
+#include <string>
+
+using namespace projectcharybdis;
+
+class PayloadFuzzingTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    client_ = std::make_unique<HttpTestClient>(agamemnon_url());
+    if (!client_->is_healthy()) {
+      GTEST_SKIP() << "Agamemnon not reachable at " << agamemnon_url();
+    }
+  }
+
+  std::unique_ptr<HttpTestClient> client_;
+};
+
+// E05: Random byte strings as payloads
+TEST_F(PayloadFuzzingTest, E05_RandomByteStrings) {
+  std::mt19937 gen(42);  // Deterministic seed for reproducibility
+  std::uniform_int_distribution<> dist(0, 255);
+
+  for (int i = 0; i < 50; ++i) {
+    std::string payload(100, '\0');
+    for (auto& c : payload) c = static_cast<char>(dist(gen));
+
+    auto [status, body] = client_->post_raw("/v1/agents", payload);
+    // Any non-5xx response is acceptable (400, 422, etc.)
+    EXPECT_NE(status, 500) << "Server returned 500 on random payload #" << i;
+  }
+
+  // Verify server survived
+  EXPECT_TRUE(client_->is_healthy()) << "Server crashed after 50 random payloads";
+}
+
+// E06: Truncated JSON
+TEST_F(PayloadFuzzingTest, E06_TruncatedJson) {
+  std::vector<std::string> truncated = {
+      R"({"name": "test)",      // Cut mid-string
+      R"({"name": "test", "la)", // Cut mid-key
+      R"({)",                    // Just opening brace
+      R"({"name":)",             // Cut after colon
+      R"([{"name": "test"})",    // Wrong type + truncated
+  };
+
+  for (const auto& payload : truncated) {
+    auto [status, body] = client_->post_raw("/v1/agents", payload);
+    EXPECT_NE(status, 500) << "500 on truncated JSON: " << payload;
+  }
+
+  EXPECT_TRUE(client_->is_healthy()) << "Server crashed after truncated JSON payloads";
+}
+
+// E07: Oversized payload (5MB)
+TEST_F(PayloadFuzzingTest, E07_OversizedPayload) {
+  std::string large_value(5 * 1024 * 1024, 'A');
+  nlohmann::json oversized = {{"name", large_value}};
+
+  auto [status, body] = client_->post_raw("/v1/agents", oversized.dump());
+  // 413 (too large), 400 (parse error), or 0 (connection reset) — all acceptable
+  EXPECT_NE(status, 500) << "Server returned 500 on 5MB payload";
+
+  // Server should still be alive
+  EXPECT_TRUE(client_->is_healthy()) << "Server crashed after 5MB payload";
+}
+
+// E14: Valid JSON but missing required fields
+TEST_F(PayloadFuzzingTest, E14_MissingRequiredFields) {
+  std::vector<nlohmann::json> payloads = {
+      nlohmann::json::object(),                        // Empty object
+      {{"irrelevant_field", "value"}},                 // No name
+      {{"name", nullptr}},                             // Null name
+      {{"name", 12345}},                               // Wrong type for name
+      {{"name", ""}},                                  // Empty string name
+  };
+
+  for (const auto& payload : payloads) {
+    auto [status, body] = client_->post("/v1/agents", payload);
+    // Graceful handling — 2xx with defaults or 4xx rejection
+    EXPECT_NE(status, 500) << "500 on payload: " << payload.dump();
+  }
+
+  EXPECT_TRUE(client_->is_healthy());
+}
+
+// E15: Valid JSON with extra unknown fields
+TEST_F(PayloadFuzzingTest, E15_ExtraUnknownFields) {
+  nlohmann::json payload = {
+      {"name", "fuzz-agent-" + random_suffix()},
+      {"label", "Fuzz Agent"},
+      {"program", "none"},
+      {"workingDirectory", "/tmp"},
+      {"taskDescription", "fuzz test"},
+      {"tags", nlohmann::json::array({"fuzz"})},
+      {"owner", "e2e"},
+      {"role", "member"},
+      // Extra fields that Agamemnon doesn't expect
+      {"unknown_field_1", "should be ignored"},
+      {"__proto__", "injection attempt"},
+      {"constructor", {{"prototype", "exploit"}}},
+      {"deeply", {{"nested", {{"unknown", true}}}}},
+  };
+
+  auto [status, body] = client_->post("/v1/agents", payload);
+  // Should create successfully, ignoring unknown fields
+  EXPECT_GE(status, 200);
+  EXPECT_LT(status, 300) << "Extra fields should be ignored, not cause errors";
+
+  EXPECT_TRUE(client_->is_healthy());
+}
