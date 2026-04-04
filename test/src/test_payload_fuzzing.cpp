@@ -11,10 +11,10 @@
 #include "projectcharybdis/http_test_client.hpp"
 #include "projectcharybdis/test_helpers.hpp"
 
-#include <gtest/gtest.h>
-
 #include <random>
 #include <string>
+
+#include <gtest/gtest.h>
 
 using namespace projectcharybdis;
 
@@ -51,11 +51,11 @@ TEST_F(PayloadFuzzingTest, E05_RandomByteStrings) {
 // E06: Truncated JSON
 TEST_F(PayloadFuzzingTest, E06_TruncatedJson) {
   std::vector<std::string> truncated = {
-      R"({"name": "test)",      // Cut mid-string
-      R"({"name": "test", "la)", // Cut mid-key
-      R"({)",                    // Just opening brace
-      R"({"name":)",             // Cut after colon
-      R"([{"name": "test"})",    // Wrong type + truncated
+      R"({"name": "test)",        // Cut mid-string
+      R"({"name": "test", "la)",  // Cut mid-key
+      R"({)",                     // Just opening brace
+      R"({"name":)",              // Cut after colon
+      R"([{"name": "test"})",     // Wrong type + truncated
   };
 
   for (const auto& payload : truncated) {
@@ -82,11 +82,11 @@ TEST_F(PayloadFuzzingTest, E07_OversizedPayload) {
 // E14: Valid JSON but missing required fields
 TEST_F(PayloadFuzzingTest, E14_MissingRequiredFields) {
   std::vector<nlohmann::json> payloads = {
-      nlohmann::json::object(),                        // Empty object
-      {{"irrelevant_field", "value"}},                 // No name
-      {{"name", nullptr}},                             // Null name
-      {{"name", 12345}},                               // Wrong type for name
-      {{"name", ""}},                                  // Empty string name
+      nlohmann::json::object(),         // Empty object
+      {{"irrelevant_field", "value"}},  // No name
+      {{"name", nullptr}},              // Null name
+      {{"name", 12345}},                // Wrong type for name
+      {{"name", ""}},                   // Empty string name
   };
 
   for (const auto& payload : payloads) {

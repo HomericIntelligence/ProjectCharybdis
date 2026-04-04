@@ -4,12 +4,8 @@
 
 namespace projectcharybdis::test {
 
-TEST(VersionTest, ProjectNameIsCorrect) {
-  EXPECT_EQ(kProjectName, "ProjectCharybdis");
-}
+TEST(VersionTest, ProjectNameIsCorrect) { EXPECT_EQ(kProjectName, "ProjectCharybdis"); }
 
-TEST(VersionTest, VersionIsSet) {
-  EXPECT_FALSE(kVersion.empty());
-}
+TEST(VersionTest, VersionIsSet) { EXPECT_FALSE(kVersion.empty()); }
 
-} // namespace projectcharybdis::test
+}  // namespace projectcharybdis::test

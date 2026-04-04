@@ -56,6 +56,7 @@
   "testPresets": [
     {"name": "debug", "configurePreset": "debug", "output": {"outputOnFailure": true}},
     {"name": "release", "configurePreset": "release", "output": {"outputOnFailure": true}},
+    {"name": "coverage", "configurePreset": "coverage", "output": {"outputOnFailure": true}},
     {"name": "ci", "configurePreset": "ci", "output": {"outputOnFailure": true}}
   ]
 }

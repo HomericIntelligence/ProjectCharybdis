@@ -37,13 +37,13 @@ jobs:
         run: |
           BUILD_TYPE_CAP=$(echo "${BUILD_TYPE}" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
           if [ "${COMPILER}" = "clang" ]; then
-            conan install . \
+            CC=clang CXX=clang++ conan install . \
               --output-folder="build/${BUILD_TYPE}" \
               --build=missing \
               -s build_type="${BUILD_TYPE_CAP}" \
               -s compiler=clang \
               -s compiler.version=18 \
-              -s compiler.libcxx=libc++ \
+              -s compiler.libcxx=libstdc++11 \
               -s compiler.cppstd=20
           else
             conan install . \
