@@ -1,5 +1,4 @@
 set(sources
-    src/main.cpp
     src/http_test_client.cpp)
 
 set(headers

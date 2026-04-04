@@ -39,8 +39,14 @@ jobs:
         run: ./scripts/coverage.sh
       - name: Check threshold
         run: |
-          LINE_COV=$(gcovr --print-summary 2>/dev/null | grep "lines:" | grep -oP '\d+\.\d+' | head -1)
-          python3 -c "import sys; cov=float('${LINE_COV}'); sys.exit(0 if cov >= 80 else 1)"
+          LINE_COV=$(gcovr \
+            --root . \
+            --filter include \
+            --filter src \
+            --print-summary \
+            build/coverage 2>/dev/null | grep "lines:" | grep -oP '\d+\.\d+' | head -1)
+          echo "Line coverage: ${LINE_COV:-0}%"
+          python3 -c "import sys; cov=float('${LINE_COV:-0}'); sys.exit(0 if cov >= 80 else 1)"
 
   check-all:
     name: All Coverage Checks
