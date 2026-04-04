@@ -14,6 +14,7 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
 endif()
 
 include(cmake/StandardSettings.cmake)
+include(cmake/Coverage.cmake)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/StaticAnalyzers.cmake)
 include(cmake/Doxygen.cmake)
@@ -40,6 +41,12 @@ target_link_libraries(${PROJECT_NAME}
     nlohmann_json::nlohmann_json)
 
 set_project_warnings(${PROJECT_NAME})
+
+# ── Standalone CLI (version banner) ──────────────────────────────────────────
+add_executable(${PROJECT_NAME}_cli src/main.cpp)
+target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_20)
+set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME}::${PROJECT_NAME})
 
 if(${PROJECT_NAME}_BUILD_TESTING)
   enable_testing()
