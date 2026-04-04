@@ -19,11 +19,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
+        env:
+          COMPILER: ${{ matrix.compiler }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build
-          if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y ninja-build python3-pip
+          if [ "${COMPILER}" = "clang" ]; then
             sudo apt-get install -y clang
+          fi
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies
+        env:
+          COMPILER: ${{ matrix.compiler }}
+          BUILD_TYPE: ${{ matrix.build_type }}
+        run: |
+          BUILD_TYPE_CAP=$(echo "${BUILD_TYPE}" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
+          if [ "${COMPILER}" = "clang" ]; then
+            conan install . \
+              --output-folder="build/${BUILD_TYPE}" \
+              --build=missing \
+              -s build_type="${BUILD_TYPE_CAP}" \
+              -s compiler=clang \
+              -s compiler.version=18 \
+              -s compiler.libcxx=libc++ \
+              -s compiler.cppstd=20
+          else
+            conan install . \
+              --output-folder="build/${BUILD_TYPE}" \
+              --build=missing \
+              -s build_type="${BUILD_TYPE_CAP}" \
+              -s compiler=gcc \
+              -s compiler.version=14 \
+              -s compiler.libcxx=libstdc++11 \
+              -s compiler.cppstd=20
           fi
       - name: Configure
         env:
