@@ -1,7 +1,6 @@
 #include "projectcharybdis/http_test_client.hpp"
 
 #include <httplib.h>
-
 #include <iostream>
 #include <regex>
 
@@ -59,7 +58,7 @@ HttpTestClient::Response HttpTestClient::del(const std::string& path) {
 }
 
 HttpTestClient::Response HttpTestClient::post_raw(const std::string& path, const std::string& body,
-                                                   const std::string& content_type) {
+                                                  const std::string& content_type) {
   httplib::Client cli(host_, port_);
   cli.set_connection_timeout(5);
   cli.set_read_timeout(10);

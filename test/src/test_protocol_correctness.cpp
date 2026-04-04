@@ -39,20 +39,25 @@ TEST_F(ProtocolCorrectnessTest, C10_IdempotentStreamCreation) {
   ASSERT_FALSE(team_id.empty());
 
   // Create agent
-  auto [s2, agent] = client_->post("/v1/agents", {
-      {"name", "c10-agent"}, {"label", "C10"}, {"program", "none"},
-      {"workingDirectory", "/tmp"}, {"taskDescription", "c10"},
-      {"tags", nlohmann::json::array({"c10"})}, {"owner", "e2e"}, {"role", "member"}
-  });
+  auto [s2, agent] = client_->post("/v1/agents", {{"name", "c10-agent"},
+                                                  {"label", "C10"},
+                                                  {"program", "none"},
+                                                  {"workingDirectory", "/tmp"},
+                                                  {"taskDescription", "c10"},
+                                                  {"tags", nlohmann::json::array({"c10"})},
+                                                  {"owner", "e2e"},
+                                                  {"role", "member"}});
   ASSERT_GE(s2, 200);
-  std::string agent_id = agent.contains("id") ? agent.value("id", "") :
-                          agent.value("agent", nlohmann::json{}).value("id", "");
+  std::string agent_id = agent.contains("id")
+                             ? agent.value("id", "")
+                             : agent.value("agent", nlohmann::json{}).value("id", "");
 
   // Create task — exercises NATS publish to hi.myrmidon.hello.*
-  auto [s3, task] = client_->post("/v1/teams/" + team_id + "/tasks", {
-      {"subject", "C10 stream test"}, {"description", "protocol test"},
-      {"type", "hello"}, {"assigneeAgentId", agent_id}
-  });
+  auto [s3, task] =
+      client_->post("/v1/teams/" + team_id + "/tasks", {{"subject", "C10 stream test"},
+                                                        {"description", "protocol test"},
+                                                        {"type", "hello"},
+                                                        {"assigneeAgentId", agent_id}});
   EXPECT_GE(s3, 200);
   EXPECT_LT(s3, 300) << "Task creation should succeed (streams exist)";
 }
@@ -63,35 +68,41 @@ TEST_F(ProtocolCorrectnessTest, TaskStateOnlyPendingOrCompleted) {
   auto [s1, team] = client_->post("/v1/teams", {{"name", "state-team"}});
   std::string team_id = team.value("team", nlohmann::json{}).value("id", "");
 
-  auto [s2, agent] = client_->post("/v1/agents", {
-      {"name", "state-agent"}, {"label", "State"}, {"program", "none"},
-      {"workingDirectory", "/tmp"}, {"taskDescription", "state"},
-      {"tags", nlohmann::json::array()}, {"owner", "e2e"}, {"role", "member"}
-  });
-  std::string agent_id = agent.contains("id") ? agent.value("id", "") :
-                          agent.value("agent", nlohmann::json{}).value("id", "");
+  auto [s2, agent] = client_->post("/v1/agents", {{"name", "state-agent"},
+                                                  {"label", "State"},
+                                                  {"program", "none"},
+                                                  {"workingDirectory", "/tmp"},
+                                                  {"taskDescription", "state"},
+                                                  {"tags", nlohmann::json::array()},
+                                                  {"owner", "e2e"},
+                                                  {"role", "member"}});
+  std::string agent_id = agent.contains("id")
+                             ? agent.value("id", "")
+                             : agent.value("agent", nlohmann::json{}).value("id", "");
 
-  auto [s3, task_resp] = client_->post("/v1/teams/" + team_id + "/tasks", {
-      {"subject", "State test"}, {"description", "state"}, {"type", "hello"},
-      {"assigneeAgentId", agent_id}
-  });
+  auto [s3, task_resp] =
+      client_->post("/v1/teams/" + team_id + "/tasks", {{"subject", "State test"},
+                                                        {"description", "state"},
+                                                        {"type", "hello"},
+                                                        {"assigneeAgentId", agent_id}});
   std::string task_id = task_resp.value("task", nlohmann::json{}).value("id", "");
 
   // Poll and collect states
   std::set<std::string> observed_states;
-  auto ok = wait_until([&]() {
-    auto [ts, tasks] = client_->get("/v1/tasks");
-    for (const auto& t : tasks.value("tasks", nlohmann::json::array())) {
-      if (t.value("id", "") == task_id) {
-        observed_states.insert(t.value("status", "unknown"));
-        return t.value("status", "") == "completed";
-      }
-    }
-    return false;
-  }, std::chrono::seconds{30});
+  auto ok = wait_until(
+      [&]() {
+        auto [ts, tasks] = client_->get("/v1/tasks");
+        for (const auto& t : tasks.value("tasks", nlohmann::json::array())) {
+          if (t.value("id", "") == task_id) {
+            observed_states.insert(t.value("status", "unknown"));
+            return t.value("status", "") == "completed";
+          }
+        }
+        return false;
+      },
+      std::chrono::seconds{30});
 
   for (const auto& state : observed_states) {
-    EXPECT_TRUE(state == "pending" || state == "completed")
-        << "Unexpected state: " << state;
+    EXPECT_TRUE(state == "pending" || state == "completed") << "Unexpected state: " << state;
   }
 }
