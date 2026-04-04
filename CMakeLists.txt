@@ -19,6 +19,9 @@ include(cmake/StaticAnalyzers.cmake)
 include(cmake/Doxygen.cmake)
 include(cmake/SourcesAndHeaders.cmake)
 
+find_package(httplib REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 add_library(${PROJECT_NAME} ${headers} ${sources})
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
@@ -30,6 +33,11 @@ target_include_directories(
   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
          $<INSTALL_INTERFACE:include>
   PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+target_link_libraries(${PROJECT_NAME}
+  PUBLIC
+    httplib::httplib
+    nlohmann_json::nlohmann_json)
 
 set_project_warnings(${PROJECT_NAME})
 

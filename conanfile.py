@@ -7,6 +7,10 @@ class ProjectCharybdisConan(ConanFile):
     version = "0.1.0"
     settings = "os", "compiler", "build_type", "arch"
 
+    def requirements(self):
+        self.requires("cpp-httplib/0.18.3")
+        self.requires("nlohmann_json/3.11.3")
+
     def build_requirements(self):
         self.test_requires("gtest/1.14.0")
 
