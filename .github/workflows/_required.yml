@@ -98,7 +98,7 @@ jobs:
             ctest --preset debug --output-on-failure
           fi
 
-  security/dependency-scan:
+  security-dependency-scan:
     name: security/dependency-scan
     runs-on: ubuntu-24.04
     steps:
@@ -122,7 +122,7 @@ jobs:
             echo "conan audit not available in this version, skipping"
           fi
 
-  security/secrets-scan:
+  security-secrets-scan:
     name: security/secrets-scan
     runs-on: ubuntu-24.04
     steps:
@@ -204,7 +204,7 @@ jobs:
             --schemafile https://json.schemastore.org/github-workflow.json \
             .github/workflows/*.yml
 
-  deps/version-sync:
+  deps-version-sync:
     name: deps/version-sync
     runs-on: ubuntu-24.04
     steps:
@@ -240,12 +240,12 @@ jobs:
       - lint
       - unit-tests
       - integration-tests
-      - security/dependency-scan
-      - security/secrets-scan
+      - security-dependency-scan
+      - security-secrets-scan
       - build
       - typecheck
       - schema-validation
-      - deps/version-sync
+      - deps-version-sync
     if: always()
     steps:
       - name: Check all required jobs passed
