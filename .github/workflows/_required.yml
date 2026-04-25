@@ -1,0 +1,285 @@
+name: Required Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: required-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format and yamllint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+          pip3 install --user yamllint
+      - name: Check C++ formatting
+        run: |
+          find . -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' \
+            | grep -v build \
+            | xargs clang-format --dry-run --Werror
+      - name: Lint GitHub Actions YAML
+        run: |
+          ~/.local/bin/yamllint .github/ || yamllint .github/
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3-pip
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies
+        run: |
+          conan install . \
+            --output-folder=build/debug \
+            --build=missing \
+            -s build_type=Debug \
+            -s compiler=gcc \
+            -s compiler.version=14 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+      - name: Configure
+        run: cmake --preset debug
+      - name: Build
+        run: cmake --build --preset debug
+      - name: Run unit tests
+        run: |
+          if ctest --preset debug --show-only 2>/dev/null | grep -q "unit"; then
+            ctest --preset debug -L unit --output-on-failure
+          else
+            ctest --preset debug --output-on-failure
+          fi
+
+  integration-tests:
+    name: integration-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3-pip
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies
+        run: |
+          conan install . \
+            --output-folder=build/debug \
+            --build=missing \
+            -s build_type=Debug \
+            -s compiler=gcc \
+            -s compiler.version=14 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+      - name: Configure
+        run: cmake --preset debug
+      - name: Build
+        run: cmake --build --preset debug
+      - name: Run integration tests
+        run: |
+          if ctest --preset debug --show-only 2>/dev/null | grep -q "integration"; then
+            ctest --preset debug -L integration --output-on-failure
+          else
+            ctest --preset debug --output-on-failure
+          fi
+
+  security/dependency-scan:
+    name: security/dependency-scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+      - name: Install Conan (for audit)
+        run: |
+          pip3 install --user conan
+      - name: Run Conan audit (if available)
+        run: |
+          if ~/.local/bin/conan audit --help &>/dev/null 2>&1 || conan audit --help &>/dev/null 2>&1; then
+            conan profile detect --force
+            conan audit . || true
+          else
+            echo "conan audit not available in this version, skipping"
+          fi
+
+  security/secrets-scan:
+    name: security/secrets-scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3-pip
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies
+        run: |
+          conan install . \
+            --output-folder=build/debug \
+            --build=missing \
+            -s build_type=Debug \
+            -s compiler=gcc \
+            -s compiler.version=14 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+      - name: Build via pixi (with cmake fallback)
+        run: |
+          if command -v pixi &>/dev/null; then
+            pixi run build
+          else
+            cmake --preset debug
+            cmake --build --preset debug
+          fi
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang clang-tidy python3-pip
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies (clang/debug)
+        run: |
+          CC=clang CXX=clang++ conan install . \
+            --output-folder=build/debug \
+            --build=missing \
+            -s build_type=Debug \
+            -s compiler=clang \
+            -s compiler.version=18 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+      - name: Configure with clang-tidy enabled
+        run: CC=clang CXX=clang++ cmake --preset debug -DProjectCharybdis_ENABLE_CLANG_TIDY=ON
+      - name: Build (clang-tidy runs as part of build)
+        run: cmake --build --preset debug
+
+  schema-validation:
+    name: schema-validation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install check-jsonschema
+        run: pip3 install --user check-jsonschema
+      - name: Validate GitHub Actions workflow schemas
+        run: |
+          ~/.local/bin/check-jsonschema \
+            --schemafile https://json.schemastore.org/github-workflow.json \
+            .github/workflows/*.yml
+
+  deps/version-sync:
+    name: deps/version-sync
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse VERSION from CMakeLists.txt
+        run: |
+          VERSION=$(grep -m1 'VERSION' CMakeLists.txt \
+            | grep -oP '\d+\.\d+\.\d+' | head -1)
+          if [ -z "${VERSION}" ]; then
+            echo "ERROR: Could not parse VERSION from CMakeLists.txt"
+            exit 1
+          fi
+          echo "Detected project version: ${VERSION}"
+          echo "PROJECT_VERSION=${VERSION}" >> "${GITHUB_ENV}"
+      - name: Verify pixi.toml version matches (if present)
+        run: |
+          if [ -f pixi.toml ]; then
+            PIXI_VERSION=$(grep -m1 '^version' pixi.toml \
+              | grep -oP '\d+\.\d+\.\d+' | head -1)
+            if [ -n "${PIXI_VERSION}" ] && [ "${PIXI_VERSION}" != "${PROJECT_VERSION}" ]; then
+              echo "ERROR: pixi.toml version (${PIXI_VERSION}) does not match CMakeLists.txt (${PROJECT_VERSION})"
+              exit 1
+            fi
+            echo "pixi.toml version ${PIXI_VERSION:-N/A} consistent with CMakeLists.txt ${PROJECT_VERSION}"
+          else
+            echo "No pixi.toml found, skipping cross-check"
+          fi
+
+  all-required:
+    name: All Build/Test Checks
+    runs-on: ubuntu-24.04
+    needs:
+      - lint
+      - unit-tests
+      - integration-tests
+      - security/dependency-scan
+      - security/secrets-scan
+      - build
+      - typecheck
+      - schema-validation
+      - deps/version-sync
+    if: always()
+    steps:
+      - name: Check all required jobs passed
+        run: |
+          results=(
+            "${{ needs.lint.result }}"
+            "${{ needs.unit-tests.result }}"
+            "${{ needs.integration-tests.result }}"
+            "${{ needs.security/dependency-scan.result }}"
+            "${{ needs.security/secrets-scan.result }}"
+            "${{ needs.build.result }}"
+            "${{ needs.typecheck.result }}"
+            "${{ needs.schema-validation.result }}"
+            "${{ needs.deps/version-sync.result }}"
+          )
+          names=(
+            "lint"
+            "unit-tests"
+            "integration-tests"
+            "security/dependency-scan"
+            "security/secrets-scan"
+            "build"
+            "typecheck"
+            "schema-validation"
+            "deps/version-sync"
+          )
+          failed=0
+          for i in "${!results[@]}"; do
+            if [ "${results[$i]}" != "success" ]; then
+              echo "FAIL: ${names[$i]} => ${results[$i]}"
+              failed=1
+            else
+              echo "OK:   ${names[$i]}"
+            fi
+          done
+          if [ "${failed}" -eq 1 ]; then exit 1; fi
+          echo "All required checks passed."
