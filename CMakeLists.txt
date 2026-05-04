@@ -18,6 +18,7 @@ include(cmake/Sanitizers.cmake)
 include(cmake/Coverage.cmake)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/StaticAnalyzers.cmake)
+include(cmake/Sanitizers.cmake)
 include(cmake/Doxygen.cmake)
 include(cmake/SourcesAndHeaders.cmake)
 

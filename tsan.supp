@@ -1,2 +1,3 @@
-# ThreadSanitizer suppression file
-# Add suppression entries here for known false positives (e.g. moodycamel lock-free queues).
+# ThreadSanitizer suppression file for ProjectCharybdis.
+# Add suppressions here as lock-free false positives are discovered.
+# Format: race:symbol_pattern  or  called_from_lib:library_name

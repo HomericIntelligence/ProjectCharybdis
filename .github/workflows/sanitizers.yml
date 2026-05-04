@@ -7,47 +7,78 @@ on:
     branches: [main]
 
 jobs:
-  sanitizers:
-    name: ${{ matrix.sanitizer }}
+  asan:
+    name: ASAN+UBSAN (gcc)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        sanitizer: [asan_ubsan, tsan]
-    env:
-      ASAN_OPTIONS: detect_leaks=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-      TSAN_OPTIONS: suppressions=tsan.supp:second_deadlock_stack=1
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang python3-pip
+          sudo apt-get install -y ninja-build python3-pip libasan8 libubsan1
           pip3 install --user conan
       - name: Configure Conan
         run: conan profile detect --force
       - name: Install Conan dependencies
-        env:
-          SANITIZER: ${{ matrix.sanitizer }}
         run: |
-          CC=clang CXX=clang++ conan install . \
-            --output-folder="build/${SANITIZER}" \
+          conan install . \
+            --output-folder=build/asan \
             --build=missing \
             -s build_type=Debug \
-            -s compiler=clang \
-            -s compiler.version=18 \
+            -s compiler=gcc \
+            -s compiler.version=14 \
             -s compiler.libcxx=libstdc++11 \
             -s compiler.cppstd=20
       - name: Configure
-        env:
-          SANITIZER: ${{ matrix.sanitizer }}
-        run: CC=clang CXX=clang++ cmake --preset "${SANITIZER}"
+        run: cmake --preset asan
       - name: Build
-        env:
-          SANITIZER: ${{ matrix.sanitizer }}
-        run: cmake --build --preset "${SANITIZER}"
+        run: cmake --build --preset asan
+      - name: Test
+        run: ctest --preset asan
+
+  tsan:
+    name: TSan (gcc)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3-pip
+          pip3 install --user conan
+      - name: Configure Conan
+        run: conan profile detect --force
+      - name: Install Conan dependencies
+        run: |
+          conan install . \
+            --output-folder=build/tsan \
+            --build=missing \
+            -s build_type=Debug \
+            -s compiler=gcc \
+            -s compiler.version=14 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+      - name: Configure
+        run: cmake --preset tsan
+      - name: Build
+        run: cmake --build --preset tsan
       - name: Test
         env:
-          SANITIZER: ${{ matrix.sanitizer }}
-        run: ctest --preset "${SANITIZER}"
+          TSAN_OPTIONS: "suppressions=${{ github.workspace }}/tsan.supp:second_deadlock_stack=1"
+        run: ctest --preset tsan
+
+  check-all:
+    name: All Sanitizer Checks
+    runs-on: ubuntu-24.04
+    needs: [asan, tsan]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ needs.asan.result }}" != "success" ]; then
+            echo "ASAN job failed"; exit 1
+          fi
+          if [ "${{ needs.tsan.result }}" != "success" ]; then
+            echo "TSan job failed"; exit 1
+          fi
+          echo "All sanitizer checks passed"
