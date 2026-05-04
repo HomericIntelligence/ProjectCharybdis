@@ -1,12 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
-
-namespace httplib {
-class Client;
-}  // namespace httplib
 
 namespace projectcharybdis {
 
@@ -17,7 +12,6 @@ class HttpTestClient {
   static constexpr std::size_t kMaxBodyBytes = 10 * 1024 * 1024;  // 10 MB
 
   explicit HttpTestClient(const std::string& base_url = "http://localhost:8080");
-  ~HttpTestClient();
 
   /// GET request, returns {status_code, body_json}
   struct Response {
@@ -25,23 +19,20 @@ class HttpTestClient {
     nlohmann::json body;
   };
 
-  Response get(const std::string& path);
-  Response post(const std::string& path, const nlohmann::json& body = {});
-  Response del(const std::string& path);
+  Response get(const std::string& path) const;
+  Response post(const std::string& path, const nlohmann::json& body = {}) const;
+  Response del(const std::string& path) const;
 
   /// POST with raw string body (for malformed payload tests)
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   Response post_raw(const std::string& path, const std::string& body,
-                    const std::string& content_type = "application/json");
+                    const std::string& content_type = "application/json") const;
 
-  bool is_healthy();
+  bool is_healthy() const;
 
  private:
-  static constexpr int kConnectionTimeoutSec = 5;
-  static constexpr int kReadTimeoutSec = 10;
-
   std::string host_;
   int port_;
-  std::unique_ptr<httplib::Client> client_;
 };
 
 }  // namespace projectcharybdis

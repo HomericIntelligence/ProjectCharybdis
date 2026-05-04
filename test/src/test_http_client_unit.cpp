@@ -51,10 +51,12 @@ TEST(HttpTestClientUnit, OutOfValidPortRangeThrows) {
 
 // ── Connection-failure paths (port 1 is always refused) ───────────────────────
 
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 class HttpTestClientOffline : public ::testing::Test {
  protected:
   // Port 1 is privileged and always connection-refused on Linux runners.
   HttpTestClientOffline() : client_("http://127.0.0.1:1") {}
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
   HttpTestClient client_;
 };
 
@@ -94,6 +96,7 @@ TEST_F(HttpTestClientOffline, IsHealthyReturnsFalse) { EXPECT_FALSE(client_.is_h
 // ── Mock server: exercises the response-body parsing paths ────────────────────
 
 /// Minimal in-process HTTP mock server for unit tests.
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 class MockServer {
  public:
   explicit MockServer() {
@@ -151,10 +154,15 @@ class MockServer {
 
   ~MockServer() {
     svr_.stop();
-    if (thread_.joinable()) thread_.join();
+    if (thread_.joinable()) { thread_.join(); }
   }
 
-  int port() const { return port_; }
+  MockServer(const MockServer&) = delete;
+  MockServer& operator=(const MockServer&) = delete;
+  MockServer(MockServer&&) = delete;
+  MockServer& operator=(MockServer&&) = delete;
+
+  [[nodiscard]] int port() const { return port_; }
 
  private:
   httplib::Server svr_;
@@ -162,6 +170,7 @@ class MockServer {
   std::thread thread_;
 };
 
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 class HttpTestClientOnline : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -174,7 +183,9 @@ class HttpTestClientOnline : public ::testing::Test {
     mock_.reset();
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
   std::unique_ptr<MockServer> mock_;
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
   std::unique_ptr<HttpTestClient> client_;
 };
 

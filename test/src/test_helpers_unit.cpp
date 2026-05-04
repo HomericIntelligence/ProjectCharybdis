@@ -8,7 +8,7 @@
 
 #include "projectcharybdis/test_helpers.hpp"
 
-#include <chrono>
+#include <string>
 
 #include <gtest/gtest.h>
 
