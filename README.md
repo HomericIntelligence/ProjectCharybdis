@@ -25,6 +25,12 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
+## Documentation
+
+- [AGENTS.md](AGENTS.md) — Multi-agent coordination: how agents invoke Charybdis, NATS subjects, and handoff protocols
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Development setup, workflow, and code standards
+- [SECURITY.md](SECURITY.md) — Responsible disclosure process
+
 ## License
 
 MIT
