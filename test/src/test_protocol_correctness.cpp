@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace projectcharybdis;
+namespace projectcharybdis {
 
 class ProtocolCorrectnessTest : public ::testing::Test {
  protected:
@@ -102,3 +102,5 @@ TEST_F(ProtocolCorrectnessTest, TaskStateOnlyPendingOrCompleted) {
     EXPECT_TRUE(state == "pending" || state == "completed") << "Unexpected state: " << state;
   }
 }
+
+}  // namespace projectcharybdis
