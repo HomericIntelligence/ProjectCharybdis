@@ -176,7 +176,7 @@ just format
 - **Standard**: C++20
 - **Formatting**: clang-format v17 (enforced by pre-commit hook)
 - **Build generator**: Ninja via CMakePresets.json
-- **Dependencies**: Managed via CMake FetchContent (GoogleTest)
+- **Dependencies**: Managed via Conan 2.x (see `conanfile.py`; includes GoogleTest, cpp-httplib, nlohmann_json)
 - **Sanitizers**: Use ASAN/TSAN for debugging memory and threading issues
 - **Test isolation**: All fault injection must target test-namespaced NATS subjects only
 
