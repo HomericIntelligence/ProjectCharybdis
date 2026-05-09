@@ -1,18 +1,21 @@
+if(${PROJECT_NAME}_ENABLE_SANITIZERS AND ${PROJECT_NAME}_ENABLE_TSAN)
+  message(FATAL_ERROR "ENABLE_SANITIZERS (ASAN+UBSAN) and ENABLE_TSAN are mutually exclusive.")
+endif()
+
 if(${PROJECT_NAME}_ENABLE_SANITIZERS)
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|.*Clang")
-    message(WARNING "Sanitizers are only supported with GCC or Clang.")
+    message(WARNING "Sanitizers only supported with GCC or Clang.")
     return()
   endif()
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
+endif()
 
-  set(sanitizer_value "${${PROJECT_NAME}_SANITIZER}")
-  if(sanitizer_value STREQUAL "tsan")
-    set(_san_flags "-fsanitize=thread")
-  else()
-    set(_san_flags "-fsanitize=address,undefined")
+if(${PROJECT_NAME}_ENABLE_TSAN)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|.*Clang")
+    message(WARNING "TSan only supported with GCC or Clang.")
+    return()
   endif()
-
-  add_compile_options(
-    $<$<COMPILE_LANGUAGE:CXX>:${_san_flags}>
-    $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>)
-  add_link_options(${_san_flags})
+  add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=thread)
 endif()
