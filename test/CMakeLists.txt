@@ -38,5 +38,20 @@ target_link_libraries(${PROJECT_NAME}_integration_tests
     nlohmann_json::nlohmann_json
     GTest::gtest_main)
 
+# Discover all integration tests except R04 (which needs an extra label).
+# gtest_discover_tests runs POST_BUILD, so set_tests_properties cannot be used
+# after the call — tests don't exist at configure time. Instead, use two
+# separate discovery calls with gtest_filter to partition the test suite.
 gtest_discover_tests(${PROJECT_NAME}_integration_tests
+    TEST_SUFFIX .nats
+    EXTRA_ARGS "--gtest_filter=-ChaosResilienceTest.R04_QueueStarve_ConsumerStalls"
     PROPERTIES LABELS "REQUIRES_NATS")
+
+# R04_QueueStarve_ConsumerStalls additionally requires a live myrmidon pull consumer.
+# Without one, the task will never advance to 'completed' and the recovery assertion
+# will always time out. CI environments without a myrmidon agent can skip with:
+#   ctest --label-exclude REQUIRES_MYRMIDON
+gtest_discover_tests(${PROJECT_NAME}_integration_tests
+    TEST_SUFFIX .myrmidon
+    EXTRA_ARGS "--gtest_filter=ChaosResilienceTest.R04_QueueStarve_ConsumerStalls"
+    PROPERTIES LABELS "REQUIRES_NATS;REQUIRES_MYRMIDON")
