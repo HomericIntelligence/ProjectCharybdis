@@ -209,6 +209,27 @@ just format
 - **Sanitizers**: Use ASAN/TSAN for debugging memory and threading issues
 - **Test isolation**: All fault injection must target test-namespaced NATS subjects only
 
+### Conan Profiles
+
+The project ships two Conan profiles under `conan/profiles/`:
+
+| Profile | `build_type` | When to use |
+|---------|-------------|-------------|
+| `default` | `Release` | Production/Docker builds. Used by the `Dockerfile` and CI image builds. Optimised binary with no debug symbols. |
+| `debug` | `Debug` | Local development. Enables debug symbols; used together with the `debug` CMake preset (ASan + UBSan). |
+
+The `Dockerfile` intentionally uses `--profile=conan/profiles/default` because the image
+is a release artifact. Contributors building locally for debugging should pass the debug
+profile explicitly:
+
+```bash
+conan install . --output-folder=build --profile=conan/profiles/debug --build=missing
+cmake --preset debug
+```
+
+Do not use the debug profile inside Docker — it produces larger binaries and is not
+suitable for the production runtime image.
+
 ## Pull Request Process
 
 ### Before You Start
