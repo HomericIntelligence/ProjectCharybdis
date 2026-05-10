@@ -59,6 +59,7 @@ TEST(HttpTestClientUnit, OutOfValidPortRangeThrows) {
 class HttpTestClientOffline : public ::testing::Test {
  protected:
   // Port 1 is privileged and always connection-refused on Linux runners.
+  // NOLINTNEXTLINE(hicpp-use-equals-default,modernize-use-equals-default)
   HttpTestClientOffline() : client_("http://127.0.0.1:1") {}
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
   HttpTestClient client_;
@@ -150,8 +151,12 @@ class MockServer {
 
     thread_ = std::thread([this]() { svr_.listen_after_bind(); });
 
-    // Wait until the server is actually accepting connections
+    // Wait until the server is actually accepting connections (5 s timeout)
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
     while (!svr_.is_running()) {
+      if (std::chrono::steady_clock::now() > deadline) {
+        throw std::runtime_error("MockServer failed to start within 5 seconds");
+      }
       std::this_thread::sleep_for(std::chrono::milliseconds{5});
     }
   }
