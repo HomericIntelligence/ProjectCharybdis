@@ -102,6 +102,16 @@
     },
     {"name": "release", "configurePreset": "release", "output": {"outputOnFailure": true}},
     {"name": "coverage", "configurePreset": "coverage", "output": {"outputOnFailure": true}},
-    {"name": "ci", "configurePreset": "ci", "output": {"outputOnFailure": true}}
+    {"name": "ci", "configurePreset": "ci", "output": {"outputOnFailure": true}},
+    {
+      "name": "integration",
+      "configurePreset": "ci",
+      "output": {"outputOnFailure": true},
+      "filter": {
+        "include": {
+          "label": "REQUIRES_NATS"
+        }
+      }
+    }
   ]
 }

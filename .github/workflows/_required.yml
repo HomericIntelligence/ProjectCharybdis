@@ -2,7 +2,7 @@ name: Required Checks
 
 on:
   workflow_run:
-    workflows: ["Build and Test", "Static Analysis", "Code Coverage", "CodeQL SAST", "Sanitizers", "Lock Check", "Container Build and Publish"]
+    workflows: ["Build and Test", "Static Analysis", "Code Coverage", "CodeQL SAST", "Sanitizers", "Lock Check", "Container Build and Publish", "Integration Tests"]
     types: [completed]
   pull_request:
     branches: [main]
@@ -67,21 +67,21 @@ jobs:
     runs-on: ubuntu-24.04
     if: >
       github.event_name != 'workflow_run' ||
-      github.event.workflow.name == 'Build and Test'
+      github.event.workflow.name == 'Integration Tests'
     steps:
-      - name: Check Build and Test result
+      - name: Check Integration Tests result
         if: github.event_name == 'workflow_run'
         env:
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           if [ "${CONCLUSION}" != "success" ]; then
-            echo "Build and Test workflow failed with: ${CONCLUSION}"
+            echo "Integration Tests workflow failed with: ${CONCLUSION}"
             exit 1
           fi
-          echo "Build and Test passed"
+          echo "Integration Tests passed"
       - name: Skip (not triggered by this workflow)
         if: github.event_name != 'workflow_run'
-        run: echo "Not a workflow_run event — pass (actual work done by Build and Test workflow)"
+        run: echo "Not a workflow_run event — pass (actual work done by Integration Tests workflow)"
 
   lint:
     name: lint

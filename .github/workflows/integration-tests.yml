@@ -1,0 +1,71 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration:
+    name: integration-tests
+    runs-on: ubuntu-24.04
+
+    services:
+      nats:
+        image: nats:latest
+        ports:
+          - 4222:4222
+        # nats:latest is a scratch image — no shell, so no healthcheck.
+        # Tests use wait_until() to retry connections instead.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 python3-pip
+          pip3 install --user conan
+
+      - name: Configure Conan
+        run: conan profile detect --force
+
+      - name: Install Conan dependencies (gcc/release)
+        run: |
+          conan install . \
+            --output-folder=build/ci \
+            --build=missing \
+            -s build_type=Release \
+            -s compiler=gcc \
+            -s compiler.version=14 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=20
+
+      - name: Configure
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci
+
+      - name: Start mock Agamemnon
+        run: python3 scripts/mock-agamemnon.py 8080 &
+        # Give the mock a moment to bind before tests connect
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      - name: Wait for mock Agamemnon to be ready
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8080/v1/health | grep -q '"ok"'; then
+              echo "mock-agamemnon ready"; exit 0
+            fi
+            sleep 0.5
+          done
+          echo "mock-agamemnon did not become ready in time"; exit 1
+
+      - name: Run integration tests
+        env:
+          AGAMEMNON_URL: http://localhost:8080
+          NATS_URL: nats://localhost:4222
+        run: ctest --preset integration
