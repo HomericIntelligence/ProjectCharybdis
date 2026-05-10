@@ -144,7 +144,7 @@ class MockServer {
 
     svr_.Get("/v1/boundary", [](const httplib::Request& /*req*/, httplib::Response& res) {
       // Exactly at the limit — not rejected
-      std::string exact(HttpTestClient::kMaxBodyBytes, 'x');
+      const std::string exact(HttpTestClient::kMaxBodyBytes, 'x');
       res.set_content(exact, "text/plain");
     });
 
@@ -213,7 +213,7 @@ TEST_F(HttpTestClientOnline, GetHandlesNonJsonBody) {
 }
 
 TEST_F(HttpTestClientOnline, PostSendsJsonBody) {
-  nlohmann::json payload = {{"ping", "pong"}};
+  const nlohmann::json payload = {{"ping", "pong"}};
   auto [status, body] = client_->post("/v1/echo", payload);
   EXPECT_EQ(status, 200);
 }

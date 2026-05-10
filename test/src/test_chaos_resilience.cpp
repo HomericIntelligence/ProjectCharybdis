@@ -13,6 +13,7 @@
 #include <chrono>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -69,12 +70,9 @@ class ChaosResilienceTest : public ::testing::Test {
       return false;
     }
     const auto faults = body.value("faults", nlohmann::json::array());
-    for (const auto& fault : faults) {
-      if (fault.value("type", "") == fault_type && fault.value("active", false)) {
-        return true;
-      }
-    }
-    return false;
+    return std::ranges::any_of(faults, [&fault_type](const auto& fault) {
+      return fault.value("type", "") == fault_type && fault.value("active", false);
+    });
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
@@ -117,11 +115,11 @@ TEST_F(ChaosResilienceTest, R02LatencyInjectionSlowResponse) {
   ASSERT_EQ(fault.value("type", ""), "latency");
 
   // Assert effect: a health probe takes >= delay_ms to complete
-  const auto t0 = std::chrono::steady_clock::now();
+  const auto start_slow = std::chrono::steady_clock::now();
   std::ignore = client_->get("/v1/health");
-  const auto elapsed_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
-          .count();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::steady_clock::now() - start_slow)
+                              .count();
   EXPECT_GE(elapsed_ms, delay_ms) << "Expected latency-injected request to take >= " << delay_ms
                                   << "ms, got " << elapsed_ms << "ms";
 
@@ -129,11 +127,11 @@ TEST_F(ChaosResilienceTest, R02LatencyInjectionSlowResponse) {
   remove(fault_id);
 
   // Assert recovery: health probe now completes quickly
-  const auto t1 = std::chrono::steady_clock::now();
+  const auto start_fast = std::chrono::steady_clock::now();
   std::ignore = client_->get("/v1/health");
-  const auto fast_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t1)
-          .count();
+  const auto fast_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - start_fast)
+                           .count();
   EXPECT_LT(fast_ms, 1000) << "Expected fast request after latency removal, got " << fast_ms
                            << "ms";
 }
@@ -168,6 +166,7 @@ TEST_F(ChaosResilienceTest, R03KillServiceHealthDegrades) {
 //   Without it, the task will never transition from 'pending' to 'completed'
 //   and the 10-second recovery assertion will always time out.
 //   Skip in CI with: ctest --label-exclude REQUIRES_MYRMIDON
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST_F(ChaosResilienceTest, R04QueueStarveConsumerStalls) {
   const auto fault = inject("/v1/chaos/queue-starve");
   const std::string fault_id = fault.value("id", "");
@@ -236,6 +235,7 @@ TEST_F(ChaosResilienceTest, R04QueueStarveConsumerStalls) {
 }
 
 // R05: Stacked faults (latency + kill) — both effects observable, all clear after removal
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST_F(ChaosResilienceTest, R05MultiFaultStackedAndClearAll) {
   const int delay_ms = 1500;
   const auto latency_fault = inject("/v1/chaos/latency", {{"delay_ms", delay_ms}});
