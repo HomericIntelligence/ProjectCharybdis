@@ -5,16 +5,21 @@ Minimal Agamemnon stub for integration tests in CI.
 Implements just enough of the Agamemnon REST API so that the chaos/resilience
 integration tests pass without a live HomericIntelligence mesh:
 
-  GET  /v1/health                  → {"status":"ok"}
+  GET  /v1/health                  → {"status":"ok"}, or 503 if a 'kill' fault is active
   POST /v1/chaos/<type>            → creates a fault record
   GET  /v1/chaos                   → lists active faults
   DEL  /v1/chaos/<id>              → removes a fault
   POST /v1/teams                   → creates a team record
   POST /v1/agents                  → creates an agent record
   POST /v1/teams/<id>/tasks        → creates a task (pending)
-  GET  /v1/tasks                   → lists tasks (immediately marks them completed)
+  GET  /v1/tasks                   → lists tasks; marks completed only when no queue-starve active
   POST /v1/chaos/test-empty        → accepts any body, returns 400 on empty JSON
   POST /v1/agents (malformed)      → returns 400 on bad content-type or unparseable body
+
+Chaos effects simulated:
+  - latency: injects time.sleep(delay_ms/1000) before every response
+  - kill:    /v1/health returns 503 {"status":"degraded"}
+  - queue-starve: GET /v1/tasks does NOT advance tasks to 'completed'
 
 All state is in-process (no persistence); the stub is single-threaded but
 that is fine for the sequential test suite.
@@ -32,6 +37,30 @@ _faults: dict = {}
 _teams: dict = {}
 _agents: dict = {}
 _tasks: dict = {}
+
+
+def _active_latency_ms() -> int:
+    """Return the sum of delay_ms across all active latency faults (0 if none)."""
+    total = 0
+    for f in _faults.values():
+        if f.get("type") == "latency" and f.get("active", False):
+            total += int(f.get("delay_ms", 0))
+    return total
+
+
+def _kill_active() -> bool:
+    """Return True if any kill fault is currently active."""
+    return any(
+        f.get("type") == "kill" and f.get("active", False) for f in _faults.values()
+    )
+
+
+def _queue_starve_active() -> bool:
+    """Return True if any queue-starve fault is currently active."""
+    return any(
+        f.get("type") == "queue-starve" and f.get("active", False)
+        for f in _faults.values()
+    )
 
 CHAOS_TYPES = {"network-partition", "latency", "kill", "queue-starve", "test-empty"}
 
@@ -53,6 +82,10 @@ class AgamemnonHandler(BaseHTTPRequestHandler):
         pass
 
     def _send(self, status: int, body: dict) -> None:
+        # Simulate latency fault: sleep before sending any response.
+        delay = _active_latency_ms()
+        if delay > 0:
+            time.sleep(delay / 1000.0)
         payload = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -64,15 +97,21 @@ class AgamemnonHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
 
         if path == "/v1/health":
-            self._send(200, {"status": "ok"})
+            # Simulate kill fault: return 503 degraded while kill is active.
+            if _kill_active():
+                self._send(503, {"status": "degraded"})
+            else:
+                self._send(200, {"status": "ok"})
 
         elif path == "/v1/chaos":
             self._send(200, {"faults": list(_faults.values())})
 
         elif path == "/v1/tasks":
-            # Immediately mark every pending task as completed so polling tests terminate.
-            for task in _tasks.values():
-                task["status"] = "completed"
+            # Mark pending tasks as completed only when no queue-starve fault is active.
+            # During a queue-starve, tasks remain pending so the test can observe the effect.
+            if not _queue_starve_active():
+                for task in _tasks.values():
+                    task["status"] = "completed"
             self._send(200, {"tasks": list(_tasks.values())})
 
         else:
