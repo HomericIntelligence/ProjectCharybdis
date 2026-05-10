@@ -1,6 +1,4 @@
 build/
 .git/
 .github/
-test/
-conan/
 *.md
