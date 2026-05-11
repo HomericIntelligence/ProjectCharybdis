@@ -2,6 +2,7 @@ FROM ubuntu:24.04 AS builder
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     cmake \
+    make \
     ninja-build \
     gcc-14 \
     g++-14 \
@@ -14,6 +15,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     libubsan1 \
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-14 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-14 100 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG USER_ID=10001
