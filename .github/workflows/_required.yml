@@ -194,6 +194,58 @@ jobs:
   # any upstream workflow result).
   # ---------------------------------------------------------------------------
 
+  forbid-suppressions:
+    name: forbid-suppressions
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: "Reject silent-failure workaround in shell/YAML/Dockerfile/justfile/HCL"
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git ls-files \
+            -- \
+            '*.sh' '*.bash' '*.yml' '*.yaml' '*.hcl' \
+            'Dockerfile*' '**/Dockerfile*' \
+            'justfile' '**/justfile' 'Justfile' '**/Justfile')
+          declare -a scan_files=()
+          for f in "${files[@]}"; do
+            case "$f" in
+              # Exempt this workflow file (heredoc would otherwise self-match)
+              .github/workflows/_required.yml) continue ;;
+              # Exempt any runbook that documents the rule (if present)
+              docs/runbooks/no-silent-failures.md) continue ;;
+            esac
+            scan_files+=("$f")
+          done
+          if [ "${#scan_files[@]}" -eq 0 ]; then
+            echo "No files to scan"
+            exit 0
+          fi
+          if grep -nE '\|\|[[:space:]]*true([[:space:]]*$|[[:space:]]+#)' "${scan_files[@]}"; then
+            echo ""
+            echo '::error::Found silent-failure workarounds above. Refactor per HomericIntelligence/Odysseus#280.'
+            exit 1
+          fi
+          echo 'OK: no silent-failure workarounds found'
+
+      - name: "Reject continue-on-error workflow opt-out"
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No workflow files"
+            exit 0
+          fi
+          if grep -nE '^[[:space:]]*continue-on-error:[[:space:]]*true[[:space:]]*$' "${files[@]}"; then
+            echo ""
+            echo '::error::Found "continue-on-error: true" above. Fix the root cause per HomericIntelligence/Odysseus#280.'
+            exit 1
+          fi
+          echo 'OK: no "continue-on-error: true" found'
+
   security-dependency-scan:
     name: security/dependency-scan
     runs-on: ubuntu-24.04
@@ -214,7 +266,7 @@ jobs:
         run: |
           if ~/.local/bin/conan audit --help &>/dev/null 2>&1 || conan audit --help &>/dev/null 2>&1; then
             conan profile detect --force
-            conan audit . || true
+            conan audit .
           else
             echo "conan audit not available in this version, skipping"
           fi
@@ -230,7 +282,7 @@ jobs:
       - name: Detect secrets
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz
-          ./gitleaks detect --source . --redact --no-git || true
+          ./gitleaks detect --source . --redact --no-git
 
   schema-validation:
     name: schema-validation
