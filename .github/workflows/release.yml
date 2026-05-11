@@ -64,7 +64,7 @@ jobs:
           TAG_NAME: ${{ env.TAG_NAME }}
         run: |
           PREV_TAG=$(git tag --sort=-creatordate \
-            | grep -v "^${TAG_NAME}$" | head -1 || true)
+            | awk -v skip="${TAG_NAME}" '$0 != skip { print; exit }')
           if [ -z "${PREV_TAG}" ]; then
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
