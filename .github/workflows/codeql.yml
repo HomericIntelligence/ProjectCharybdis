@@ -37,7 +37,7 @@ jobs:
           conan profile show
 
       - name: Install Conan dependencies
-        run: conan install . --output-folder=build/ci --build=missing -s build_type=Release
+        run: conan install . --output-folder=build/ci --build=missing --lockfile=conan.lock -s build_type=Release
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e  # v4

@@ -24,6 +24,7 @@ jobs:
           conan install . \
             --output-folder=build/asan \
             --build=missing \
+            --lockfile=conan.lock \
             -s build_type=Debug \
             -s compiler=gcc \
             -s compiler.version=14 \
@@ -53,6 +54,7 @@ jobs:
           conan install . \
             --output-folder=build/tsan \
             --build=missing \
+            --lockfile=conan.lock \
             -s build_type=Debug \
             -s compiler=gcc \
             -s compiler.version=14 \
