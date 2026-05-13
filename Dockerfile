@@ -29,7 +29,8 @@ ARG USER_NAME=builder
 RUN groupadd -g ${GROUP_ID} ${USER_NAME} \
     && useradd -m -u ${USER_ID} -g ${GROUP_ID} ${USER_NAME} \
     && chmod 755 /home/${USER_NAME} \
-    && mkdir -p /src && chown ${USER_ID}:${GROUP_ID} /src
+    && mkdir -p /src && chown ${USER_ID}:${GROUP_ID} /src \
+    && mkdir -p /install && chown ${USER_ID}:${GROUP_ID} /install
 
 ENV VIRTUAL_ENV=/opt/conan-venv
 RUN python3 -m venv $VIRTUAL_ENV \
@@ -70,6 +71,11 @@ RUN cmake -B build -G Ninja \
 # Run tests as part of the build to validate.
 RUN ctest --test-dir build --output-on-failure
 
+# Install to /install (pre-created and owned by ${USER_NAME} above so the
+# non-root builder user can write to it). The CLI target is defined in
+# CMakeLists.txt as `${PROJECT_NAME}_cli` with `OUTPUT_NAME ${PROJECT_NAME}`
+# and installed via GNUInstallDirs RUNTIME DESTINATION → `bin`, so the binary
+# ends up at `/install/bin/ProjectCharybdis`.
 RUN cmake --install build --prefix /install
 
 # ---------------------------------------------------------------------------
@@ -82,6 +88,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /bin/false charybdis
 
+# Source path mirrors the install rule above; renaming to `charybdis` keeps
+# the runtime invocation short and decoupled from the CMake project name.
 COPY --from=builder /install/bin/ProjectCharybdis /usr/local/bin/charybdis
 
 USER charybdis
