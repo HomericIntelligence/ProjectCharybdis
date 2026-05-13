@@ -49,6 +49,7 @@ runs:
           CC=clang CXX=clang++ conan install . \
             --output-folder="${FOLDER}" \
             --build=missing \
+            --lockfile=conan.lock \
             -s build_type="${BUILD_TYPE_CAP}" \
             -s compiler=clang \
             -s compiler.version="${CLANG_VERSION}" \
@@ -58,6 +59,7 @@ runs:
           conan install . \
             --output-folder="${FOLDER}" \
             --build=missing \
+            --lockfile=conan.lock \
             -s build_type="${BUILD_TYPE_CAP}" \
             -s compiler=gcc \
             -s compiler.version="${GCC_VERSION}" \
