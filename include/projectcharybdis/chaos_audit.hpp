@@ -3,13 +3,14 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -108,14 +109,13 @@ class ChaosAuditLog {
       return std::string{"1970-01-01T00:00:00.000Z"};
     }
 
-    // ".NNNZ" is 5 chars; full ISO-8601 with millis fits in 24+5+1=30.
-    std::array<char, 32> out_buf{};
-    const int written = std::snprintf(out_buf.data(), out_buf.size(), "%s.%03lldZ", date_buf.data(),
-                                      static_cast<long long>(millis));
-    if (written <= 0 || static_cast<std::size_t>(written) >= out_buf.size()) {
-      return std::string{"1970-01-01T00:00:00.000Z"};
-    }
-    return std::string{out_buf.data(), static_cast<std::size_t>(written)};
+    // Compose the trailing ".NNNZ" with std::ostringstream to avoid C-vararg
+    // snprintf (cppcoreguidelines-pro-type-vararg) while keeping the
+    // strftime-formatted date portion verbatim.
+    std::ostringstream out;
+    out << date_buf.data() << '.' << std::setw(3) << std::setfill('0')
+        << static_cast<std::int64_t>(millis) << 'Z';
+    return out.str();
   }
 
   static std::string current_requester() {

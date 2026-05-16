@@ -51,7 +51,7 @@ class ChaosAuditLogTest : public ::testing::Test {
   }
 
   static std::string slurp(const std::string& path) {
-    std::ifstream input{path};
+    const std::ifstream input{path};
     std::stringstream stream;
     stream << input.rdbuf();
     return stream.str();
@@ -105,8 +105,8 @@ TEST_F(ChaosAuditLogTest, MultipleEventsAreNewlineDelimited) {
   }
   auto contents = slurp(path_);
   std::size_t lines = 0;
-  for (const char ch : contents) {
-    if (ch == '\n') {
+  for (const char chr : contents) {
+    if (chr == '\n') {
       ++lines;
     }
   }
