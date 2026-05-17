@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -51,15 +52,37 @@ class ChaosAuditLog {
   ChaosAuditLog() {
     // NOLINTNEXTLINE(concurrency-mt-unsafe)
     const char* dest = std::getenv("CHAOS_AUDIT_LOG");
-    if (dest != nullptr && *dest != '\0' && std::string_view{dest} != "-" &&
-        std::string_view{dest} != "stderr") {
-      file_.open(dest, std::ios::app);
-      if (!file_.is_open()) {
-        std::cerr << R"({"chaos_audit_warning":"failed to open CHAOS_AUDIT_LOG=)" << dest
-                  << R"(; falling back to stderr"})" << '\n';
-      } else {
-        path_ = dest;
+    if (dest == nullptr || *dest == '\0' || std::string_view{dest} == "-" ||
+        std::string_view{dest} == "stderr") {
+      return;
+    }
+    const std::string_view dest_view{dest};
+    // Reject path-traversal and other untrusted-input footguns before
+    // touching the filesystem. CHAOS_AUDIT_LOG flows in from the
+    // environment, so we treat it as tainted: only accept paths free of
+    // embedded NULs and `..` traversal segments.
+    if (dest_view.find('\0') != std::string_view::npos) {
+      std::cerr << R"({"chaos_audit_warning":"CHAOS_AUDIT_LOG contains embedded NUL; falling back to stderr"})"
+                << '\n';
+      return;
+    }
+    const std::filesystem::path candidate(dest_view);
+    for (const auto& part : candidate) {
+      if (part == "..") {
+        std::cerr << R"({"chaos_audit_warning":"CHAOS_AUDIT_LOG rejects parent-directory traversal; falling back to stderr"})"
+                  << '\n';
+        return;
       }
+    }
+    std::error_code ec;
+    const std::filesystem::path resolved = std::filesystem::weakly_canonical(candidate, ec);
+    const std::filesystem::path& open_path = ec ? candidate : resolved;
+    file_.open(open_path, std::ios::app);
+    if (!file_.is_open()) {
+      std::cerr << R"({"chaos_audit_warning":"failed to open CHAOS_AUDIT_LOG=)" << open_path.string()
+                << R"(; falling back to stderr"})" << '\n';
+    } else {
+      path_ = open_path.string();
     }
   }
 
